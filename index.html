@@ -2,111 +2,134 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Client Info (Iframe)</title>
+  <title>Client Info (Base64 Only)</title>
   <style>
     body {
       font-family: monospace;
-      white-space: pre-wrap;
+      background: #f5f5f5;
+      padding: 2em;
+    }
+    textarea {
+      width: 100%;
+      height: 300px;
       padding: 1em;
-      background: #f9f9f9;
+      border: 1px solid #ccc;
+      font-size: 14px;
+      resize: vertical;
+      border-radius: 6px;
+      box-sizing: border-box;
     }
   </style>
 </head>
 <body>
-  <h2>Client Environment Info (Inside Iframe)</h2>
-  <div id="report">Collecting...</div>
 
-  <script>
-    (async function gatherClientInfo() {
-      const report = {};
-      const output = document.getElementById('report');
+<h1>🔐 Client Info (Base64 Encoded)</h1>
+<textarea id="b64" readonly>Loading...</textarea>
 
-      report['User Agent'] = navigator.userAgent;
-      report['Platform'] = navigator.platform;
-      report['App Version'] = navigator.appVersion;
-      report['Vendor'] = navigator.vendor;
-      report['Languages'] = navigator.languages;
-      report['Language'] = navigator.language;
-      report['Online'] = navigator.onLine;
+<script>
+(async function gatherAndEncode() {
+  const info = {};
 
-      report['Screen Width'] = screen.width;
-      report['Screen Height'] = screen.height;
-      report['Device Pixel Ratio'] = window.devicePixelRatio;
-      report['Viewport Width'] = window.innerWidth;
-      report['Viewport Height'] = window.innerHeight;
-      report['Max Touch Points'] = navigator.maxTouchPoints;
+  // Basic browser info
+  info.userAgent = navigator.userAgent;
+  info.platform = navigator.platform;
+  info.appVersion = navigator.appVersion;
+  info.vendor = navigator.vendor;
+  info.languages = navigator.languages;
+  info.language = navigator.language;
 
-      report['Timezone'] = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      report['Locale'] = Intl.NumberFormat().resolvedOptions().locale;
+  // Display info
+  info.screen = {
+    width: screen.width,
+    height: screen.height,
+    devicePixelRatio: window.devicePixelRatio,
+    viewportWidth: window.innerWidth,
+    viewportHeight: window.innerHeight,
+  };
 
-      report['Hardware Concurrency'] = navigator.hardwareConcurrency;
-      report['Device Memory (GB)'] = navigator.deviceMemory || 'Not supported';
+  // System info
+  info.hardwareConcurrency = navigator.hardwareConcurrency;
+  info.deviceMemory = navigator.deviceMemory || 'unknown';
+  info.maxTouchPoints = navigator.maxTouchPoints;
+  info.onLine = navigator.onLine;
 
-      if (navigator.storage?.estimate) {
-        const { quota, usage } = await navigator.storage.estimate();
-        report['Storage Quota (bytes)'] = quota;
-        report['Storage Usage (bytes)'] = usage;
-      }
+  // Locale & time
+  info.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  info.locale = Intl.NumberFormat().resolvedOptions().locale;
 
-      const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-      if (conn) {
-        report['Network Type'] = conn.effectiveType;
-        report['Downlink'] = conn.downlink;
-        report['RTT'] = conn.rtt;
-      }
+  // Feature detection
+  info.features = {
+    webAssembly: typeof WebAssembly !== 'undefined',
+    bigint: typeof BigInt !== 'undefined',
+    clipboard: !!navigator.clipboard,
+    serviceWorker: 'serviceWorker' in navigator,
+    fetch: typeof fetch === 'function'
+  };
 
-      if (navigator.getBattery) {
-        try {
-          const battery = await navigator.getBattery();
-          report['Battery Level (%)'] = battery.level * 100;
-          report['Charging'] = battery.charging;
-        } catch {}
-      }
+  // Storage info
+  if (navigator.storage?.estimate) {
+    const { quota, usage } = await navigator.storage.estimate();
+    info.storage = { quota, usage };
+  }
 
-      if (navigator.mediaDevices?.enumerateDevices) {
-        try {
-          const devices = await navigator.mediaDevices.enumerateDevices();
-          report['Media Devices'] = devices.map(d => `${d.kind}: ${d.label || '(hidden)'}`);
-        } catch {}
-      }
+  // Network info
+  const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (conn) {
+    info.network = {
+      effectiveType: conn.effectiveType,
+      downlink: conn.downlink,
+      rtt: conn.rtt
+    };
+  }
 
-      try {
-        const canvas = document.createElement('canvas');
-        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-        if (debugInfo) {
-          report['GPU Vendor'] = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
-          report['GPU Renderer'] = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
-        }
-      } catch {}
+  // Battery info
+  if (navigator.getBattery) {
+    try {
+      const battery = await navigator.getBattery();
+      info.battery = {
+        level: battery.level,
+        charging: battery.charging
+      };
+    } catch {}
+  }
 
-      report['WebAssembly'] = typeof WebAssembly !== 'undefined';
-      report['BigInt'] = typeof BigInt !== 'undefined';
-      report['Clipboard API'] = !!navigator.clipboard;
-      report['Service Worker'] = 'serviceWorker' in navigator;
+  // GPU info via WebGL
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl');
+    const debug = gl.getExtension('WEBGL_debug_renderer_info');
+    if (debug) {
+      info.gpu = {
+        vendor: gl.getParameter(debug.UNMASKED_VENDOR_WEBGL),
+        renderer: gl.getParameter(debug.UNMASKED_RENDERER_WEBGL)
+      };
+    }
+  } catch {}
 
-      try {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        ctx.textBaseline = 'top';
-        ctx.font = '16px Arial';
-        ctx.fillText('CanvasFingerprint', 2, 2);
-        report['Canvas Fingerprint'] = canvas.toDataURL();
-      } catch {}
+  // Canvas fingerprint
+  try {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.textBaseline = 'top';
+    ctx.font = '16px Arial';
+    ctx.fillText('CanvasFingerprint', 2, 2);
+    info.canvasFingerprint = canvas.toDataURL();
+  } catch {}
 
-      if (navigator.permissions) {
-        try {
-          const geo = await navigator.permissions.query({ name: 'geolocation' });
-          report['Geolocation Permission'] = geo.state;
-        } catch {}
-      }
+  // Geolocation permission (if available)
+  if (navigator.permissions) {
+    try {
+      const geoPerm = await navigator.permissions.query({ name: 'geolocation' });
+      info.geolocationPermission = geoPerm.state;
+    } catch {}
+  }
 
-      report['Pointer Support'] = 'ontouchstart' in window ? 'Touch' : 'Mouse';
+  // Convert to base64
+  const json = JSON.stringify(info, null, 2);
+  const base64 = btoa(unescape(encodeURIComponent(json)));
+  document.getElementById('b64').value = base64;
+})();
+</script>
 
-      output.textContent = Object.entries(report)
-        .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join('\n  ') : v}`)
-        .join('\n\n');
-    })();
-  </script>
 </body>
 </html>
