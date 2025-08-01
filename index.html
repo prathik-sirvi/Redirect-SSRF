@@ -2,144 +2,111 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Client Info Summary</title>
+  <title>Client Info (Iframe)</title>
   <style>
-    body { font-family: monospace; white-space: pre-wrap; padding: 1em; }
-    h2 { margin-top: 1.5em; }
+    body {
+      font-family: monospace;
+      white-space: pre-wrap;
+      padding: 1em;
+      background: #f9f9f9;
+    }
   </style>
 </head>
 <body>
+  <h2>Client Environment Info (Inside Iframe)</h2>
+  <div id="report">Collecting...</div>
 
-<h1>Client Environment Info</h1>
-<div id="report">Gathering info...</div>
+  <script>
+    (async function gatherClientInfo() {
+      const report = {};
+      const output = document.getElementById('report');
 
-<script>
-(async function gatherClientInfo() {
-  const report = {};
-  const output = document.getElementById('report');
+      report['User Agent'] = navigator.userAgent;
+      report['Platform'] = navigator.platform;
+      report['App Version'] = navigator.appVersion;
+      report['Vendor'] = navigator.vendor;
+      report['Languages'] = navigator.languages;
+      report['Language'] = navigator.language;
+      report['Online'] = navigator.onLine;
 
-  // ============ 1. Basic Navigator Info ============
-  report['User Agent'] = navigator.userAgent;
-  report['Platform'] = navigator.platform;
-  report['App Version'] = navigator.appVersion;
-  report['Vendor'] = navigator.vendor;
-  report['Languages'] = navigator.languages;
-  report['Language'] = navigator.language;
-  report['Online'] = navigator.onLine;
+      report['Screen Width'] = screen.width;
+      report['Screen Height'] = screen.height;
+      report['Device Pixel Ratio'] = window.devicePixelRatio;
+      report['Viewport Width'] = window.innerWidth;
+      report['Viewport Height'] = window.innerHeight;
+      report['Max Touch Points'] = navigator.maxTouchPoints;
 
-  // ============ 2. Screen & Display ============
-  report['Screen Width'] = screen.width;
-  report['Screen Height'] = screen.height;
-  report['Device Pixel Ratio'] = window.devicePixelRatio;
-  report['Viewport Width'] = window.innerWidth;
-  report['Viewport Height'] = window.innerHeight;
-  report['Max Touch Points'] = navigator.maxTouchPoints;
+      report['Timezone'] = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      report['Locale'] = Intl.NumberFormat().resolvedOptions().locale;
 
-  // ============ 3. Time & Locale ============
-  report['Timezone'] = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  report['Locale'] = Intl.NumberFormat().resolvedOptions().locale;
+      report['Hardware Concurrency'] = navigator.hardwareConcurrency;
+      report['Device Memory (GB)'] = navigator.deviceMemory || 'Not supported';
 
-  // ============ 4. Hardware & Memory ============
-  report['Hardware Concurrency (CPU Cores)'] = navigator.hardwareConcurrency;
-  report['Device Memory (approx GB)'] = navigator.deviceMemory || 'Not supported';
+      if (navigator.storage?.estimate) {
+        const { quota, usage } = await navigator.storage.estimate();
+        report['Storage Quota (bytes)'] = quota;
+        report['Storage Usage (bytes)'] = usage;
+      }
 
-  // ============ 5. Storage Info ============
-  if (navigator.storage && navigator.storage.estimate) {
-    const { quota, usage } = await navigator.storage.estimate();
-    report['Storage Quota (bytes)'] = quota;
-    report['Storage Usage (bytes)'] = usage;
-  } else {
-    report['Storage Info'] = 'Not supported';
-  }
+      const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (conn) {
+        report['Network Type'] = conn.effectiveType;
+        report['Downlink'] = conn.downlink;
+        report['RTT'] = conn.rtt;
+      }
 
-  // ============ 6. Network Info ============
-  const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-  if (conn) {
-    report['Network Type'] = conn.effectiveType;
-    report['Downlink (Mb/s)'] = conn.downlink;
-    report['RTT (ms)'] = conn.rtt;
-  } else {
-    report['Network Info'] = 'Not supported';
-  }
+      if (navigator.getBattery) {
+        try {
+          const battery = await navigator.getBattery();
+          report['Battery Level (%)'] = battery.level * 100;
+          report['Charging'] = battery.charging;
+        } catch {}
+      }
 
-  // ============ 7. Battery Info ============
-  if (navigator.getBattery) {
-    try {
-      const battery = await navigator.getBattery();
-      report['Battery Level (%)'] = battery.level * 100;
-      report['Charging'] = battery.charging;
-    } catch {
-      report['Battery'] = 'Error retrieving';
-    }
-  } else {
-    report['Battery'] = 'Not supported';
-  }
+      if (navigator.mediaDevices?.enumerateDevices) {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          report['Media Devices'] = devices.map(d => `${d.kind}: ${d.label || '(hidden)'}`);
+        } catch {}
+      }
 
-  // ============ 8. Media Devices ============
-  if (navigator.mediaDevices?.enumerateDevices) {
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      report['Media Devices'] = devices.map(d => `${d.kind}: ${d.label || '(label hidden)'}`);
-    } catch {
-      report['Media Devices'] = 'Permission denied or error';
-    }
-  } else {
-    report['Media Devices'] = 'Not supported';
-  }
+      try {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        if (debugInfo) {
+          report['GPU Vendor'] = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+          report['GPU Renderer'] = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+        }
+      } catch {}
 
-  // ============ 9. WebGL / GPU Info ============
-  try {
-    const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-    if (debugInfo) {
-      report['GPU Vendor'] = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
-      report['GPU Renderer'] = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
-    } else {
-      report['GPU Info'] = 'WEBGL_debug_renderer_info not supported';
-    }
-  } catch {
-    report['GPU Info'] = 'WebGL not supported';
-  }
+      report['WebAssembly'] = typeof WebAssembly !== 'undefined';
+      report['BigInt'] = typeof BigInt !== 'undefined';
+      report['Clipboard API'] = !!navigator.clipboard;
+      report['Service Worker'] = 'serviceWorker' in navigator;
 
-  // ============ 10. Web Features ============
-  report['WebAssembly'] = typeof WebAssembly !== 'undefined';
-  report['BigInt'] = typeof BigInt !== 'undefined';
-  report['Clipboard API'] = !!navigator.clipboard;
-  report['Service Worker'] = 'serviceWorker' in navigator;
-  report['Fetch API'] = typeof fetch === 'function';
+      try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.textBaseline = 'top';
+        ctx.font = '16px Arial';
+        ctx.fillText('CanvasFingerprint', 2, 2);
+        report['Canvas Fingerprint'] = canvas.toDataURL();
+      } catch {}
 
-  // ============ 11. Canvas Fingerprint ============
-  try {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    ctx.textBaseline = 'top';
-    ctx.font = '16px Arial';
-    ctx.fillText('CanvasFingerprint', 2, 2);
-    report['Canvas Fingerprint'] = canvas.toDataURL();
-  } catch {
-    report['Canvas Fingerprint'] = 'Not supported';
-  }
+      if (navigator.permissions) {
+        try {
+          const geo = await navigator.permissions.query({ name: 'geolocation' });
+          report['Geolocation Permission'] = geo.state;
+        } catch {}
+      }
 
-  // ============ 12. Permissions ============
-  if (navigator.permissions) {
-    try {
-      const geolocation = await navigator.permissions.query({ name: 'geolocation' });
-      report['Geolocation Permission'] = geolocation.state;
-    } catch {
-      report['Geolocation Permission'] = 'Error or not supported';
-    }
-  }
+      report['Pointer Support'] = 'ontouchstart' in window ? 'Touch' : 'Mouse';
 
-  // ============ 13. Touch / Pointer Info ============
-  report['Pointer Type Detection'] = 'ontouchstart' in window ? 'Touch' : 'Mouse';
-
-  // ============ Render Output ============
-  output.textContent = Object.entries(report)
-    .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join('\n  ') : value}`)
-    .join('\n\n');
-})();
-</script>
-
+      output.textContent = Object.entries(report)
+        .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join('\n  ') : v}`)
+        .join('\n\n');
+    })();
+  </script>
 </body>
 </html>
